@@ -16,8 +16,10 @@ def summarize(spans, token_baseline=1000, cost_baseline=0.05):
     runs = []
     for tid, members in by_trace.items():
         failed = [m.name for m in members if m.status == "error"]
-        tokens = sum(_num(m.attrs, "gen_ai.usage.input_tokens")
-                     + _num(m.attrs, "gen_ai.usage.output_tokens") for m in members)
+        tokens = sum(
+            _num(m.attrs, "gen_ai.usage.input_tokens") + _num(m.attrs, "gen_ai.usage.output_tokens")
+            for m in members
+        )
         cost = sum(_num(m.attrs, "gen_ai.usage.cost_usd") for m in members)
         max_lat = max((m.duration_ms for m in members), default=0.0)
         flags = []
@@ -27,8 +29,16 @@ def summarize(spans, token_baseline=1000, cost_baseline=0.05):
             flags.append("token_spike")
         if cost > cost_baseline:
             flags.append("cost_spike")
-        runs.append({"trace_id": tid, "ok": not failed, "failed_steps": failed,
-                     "total_tokens": int(tokens), "cost_usd": round(cost, 4),
-                     "max_latency_ms": round(max_lat, 1), "flags": flags})
+        runs.append(
+            {
+                "trace_id": tid,
+                "ok": not failed,
+                "failed_steps": failed,
+                "total_tokens": int(tokens),
+                "cost_usd": round(cost, 4),
+                "max_latency_ms": round(max_lat, 1),
+                "flags": flags,
+            }
+        )
     runs.sort(key=lambda r: (r["ok"], -r["cost_usd"], -r["total_tokens"]))
     return runs

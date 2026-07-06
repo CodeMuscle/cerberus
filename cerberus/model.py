@@ -3,6 +3,7 @@
 span_from_signoz is the ONE place that knows SigNoz's JSON. Everything else uses
 the clean Span. When the real SigNoz shape differs from the guess, fix only here.
 """
+
 from dataclasses import dataclass
 
 
@@ -13,7 +14,7 @@ class Span:
     name: str
     service: str
     duration_ms: float
-    status: str          # "ok" | "error" | "unset"
+    status: str  # "ok" | "error" | "unset"
     attrs: dict
 
 
