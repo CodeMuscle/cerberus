@@ -49,7 +49,7 @@ flowchart LR
 | **Backend** | Python 3.11 · FastAPI · Pydantic · httpx |
 | **Telemetry** | OpenTelemetry (SDK + OTLP exporter) → SigNoz query API |
 | **Copilot** | LLM over deterministic incident facts (injectable — local Llama or hosted) |
-| **Frontend** | Next.js 15 · React · TypeScript · Tailwind · shadcn/ui · Recharts |
+| **Frontend** | Next.js 16 · React · TypeScript · Tailwind · shadcn/ui · Recharts |
 | **Quality** | ruff · mypy · pytest + coverage · ESLint · Prettier · pre-commit · GitHub Actions |
 
 ## Monorepo layout
