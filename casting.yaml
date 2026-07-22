@@ -1,0 +1,20 @@
+# Cerberus — reproducible SigNoz deployment (Foundry).
+#
+# Judges: `foundryctl cast -f casting.yaml` brings up SigNoz on :8080 and the
+# SigNoz MCP server on :8000. Cerberus reads telemetry exclusively through that
+# MCP server, so this file is the only deployment step required.
+#
+#   curl -fsSL https://signoz.io/foundry.sh | bash
+#   foundryctl cast -f casting.yaml
+apiVersion: v1alpha1
+kind: Installation
+metadata:
+  name: signoz
+spec:
+  deployment:
+    flavor: compose
+    mode: docker
+  # Cerberus's read path. Without this the copilot has no telemetry source.
+  mcp:
+    spec:
+      enabled: true
