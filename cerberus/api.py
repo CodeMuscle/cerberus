@@ -2,7 +2,7 @@
 
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -30,6 +30,38 @@ class Ask(BaseModel):
     minutes: int = 15
 
 
+def _causes(e: BaseException, depth: int = 0):
+    """Flatten an exception tree. The MCP client runs in a task group, so the real
+    HTTP error is nested inside an ExceptionGroup — str(e) alone just says
+    "unhandled errors in a TaskGroup" and hides the status code."""
+    if depth > 10:  # cause chains can cycle
+        return
+    yield e
+    if isinstance(e, BaseExceptionGroup):
+        for sub in e.exceptions:
+            yield from _causes(sub, depth + 1)
+    for nxt in (e.__cause__, e.__context__):
+        if nxt is not None:
+            yield from _causes(nxt, depth + 1)
+
+
+def _runs(service: str, minutes: int):
+    """Fetch + summarize, turning a dead or unauthenticated MCP server into a 503
+    that says what to fix. Without this the MCP 401 surfaces as a bare 500."""
+    try:
+        return summarize(fetch_spans(service, minutes))
+    except Exception as e:
+        text = " | ".join(str(x) for x in _causes(e))
+        if "401" in text or "403" in text:
+            detail = (
+                "SigNoz MCP server rejected the request (401/403). Set SIGNOZ_API_KEY "
+                "to a key from SigNoz → Settings → Service Accounts."
+            )
+        else:
+            detail = f"Cannot read telemetry from the SigNoz MCP server: {text[:300]}"
+        raise HTTPException(status_code=503, detail=detail) from e
+
+
 @app.get("/health")
 def health():
     return {"ok": True}
@@ -37,10 +69,10 @@ def health():
 
 @app.get("/incidents")
 def incidents(service: str = DEFAULT_SERVICE, minutes: int = 15):
-    return summarize(fetch_spans(service, minutes))
+    return _runs(service, minutes)
 
 
 @app.post("/ask")
 def ask(a: Ask):
-    runs = summarize(fetch_spans(a.service, a.minutes))
+    runs = _runs(a.service, a.minutes)
     return {"answer": explain(a.question, runs), "runs": runs[:5]}
