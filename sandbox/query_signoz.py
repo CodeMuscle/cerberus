@@ -8,6 +8,7 @@ Self-host defaults: UI/API on http://localhost:8080 (newer) or :3301 (older).
 Auth: SigNoz Cloud uses SIGNOZ_API_KEY header; self-host may need none or a key
 from Settings -> API Keys. Set SIGNOZ_URL / SIGNOZ_API_KEY env vars.
 """
+
 import json
 import os
 import time
@@ -21,8 +22,10 @@ def _post(path, body):
     req = urllib.request.Request(
         BASE + path,
         data=json.dumps(body).encode(),
-        headers={"Content-Type": "application/json",
-                 **({"SIGNOZ-API-KEY": API_KEY} if API_KEY else {})},
+        headers={
+            "Content-Type": "application/json",
+            **({"SIGNOZ-API-KEY": API_KEY} if API_KEY else {}),
+        },
         method="POST",
     )
     with urllib.request.urlopen(req, timeout=15) as r:
@@ -48,9 +51,10 @@ def recent_agent_spans(service="cerberus-demo-agent", minutes=15):
                     "dataSource": "traces",
                     "queryName": "A",
                     "aggregateOperator": "noop",
-                    "filters": {"op": "AND", "items": [
-                        {"key": {"key": "service.name"}, "op": "=", "value": service}
-                    ]},
+                    "filters": {
+                        "op": "AND",
+                        "items": [{"key": {"key": "service.name"}, "op": "=", "value": service}],
+                    },
                     "limit": 20,
                 }
             },
@@ -63,5 +67,7 @@ if __name__ == "__main__":
     try:
         print(json.dumps(recent_agent_spans(), indent=2)[:2000])
     except Exception as e:
-        print(f"Query failed ({e}). Expected until you verify the endpoint/auth "
-              f"for your SigNoz version — see the module docstring.")
+        print(
+            f"Query failed ({e}). Expected until you verify the endpoint/auth "
+            f"for your SigNoz version — see the module docstring."
+        )

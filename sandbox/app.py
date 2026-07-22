@@ -9,20 +9,23 @@ Run:  uvicorn app:app --port 8090
 Then: curl "localhost:8090/run"  and  curl "localhost:8090/run?fail=1"
 Open SigNoz -> Services -> cerberus-demo-agent to see the traces.
 """
+
+import os
 import time
 
 from fastapi import FastAPI
-from opentelemetry.trace import Status, StatusCode
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-
+from opentelemetry.trace import Status, StatusCode
 from otel import setup_tracing
 
 tracer = setup_tracing()
 app = FastAPI(title="cerberus-demo-agent")
 FastAPIInstrumentor.instrument_app(app)
 
-MODEL = "llama3.1:8b"
-COST_PER_1K = 0.0  # local model is free; set for hosted to see $ spikes
+MODEL = os.getenv("DEMO_MODEL", "claude-opus-4-8")
+# Blended $/1K tokens for the demo workload. Non-zero so a runaway prompt shows up
+# as a cost spike in SigNoz, not just a token spike.
+COST_PER_1K = float(os.getenv("COST_PER_1K", "0.03"))
 
 
 def _llm_span(name, prompt_tokens, completion_tokens, fail=False):

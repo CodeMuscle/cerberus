@@ -2,21 +2,48 @@
 trace-cited answer. The LLM (analyst) is injected so this is unit-testable offline."""
 
 import json
+import os
+
+SYSTEM = (
+    "You are an SRE copilot. Explain the incident in 2-3 sentences, grounded ONLY in the "
+    "facts given, and cite the trace_id. No speculation. If the facts don't answer the "
+    "question, say so."
+)
+
+
+def _claude(prompt: str) -> str:
+    import anthropic
+
+    message = anthropic.Anthropic().messages.create(
+        model=os.getenv("CERBERUS_MODEL", "claude-opus-4-8"),
+        max_tokens=1024,  # answers are 2-3 sentences; a bigger cap only adds latency
+        system=SYSTEM,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return next((b.text for b in message.content if b.type == "text"), "")
+
+
+def _ollama(prompt: str) -> str:
+    """Keyless fallback so the repo runs for anyone who clones it."""
+    import httpx
+
+    host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+    r = httpx.post(
+        f"{host}/api/generate",
+        json={
+            "model": os.getenv("OLLAMA_MODEL", "llama3.1:8b"),
+            "system": SYSTEM,
+            "prompt": prompt,
+            "stream": False,
+        },
+        timeout=120,
+    )
+    r.raise_for_status()
+    return r.json().get("response", "")
 
 
 def _default_analyst(prompt):
-    import asyncio
-
-    from cognee.infrastructure.llm.LLMGateway import LLMGateway  # reuse the Crosscheck LLM path
-
-    return asyncio.run(
-        LLMGateway.acreate_structured_output(
-            text_input=prompt,
-            system_prompt="You are an SRE copilot. Explain the incident in 2-3 sentences, "
-            "grounded ONLY in the facts given, and cite the trace_id. No speculation.",
-            response_model=str,
-        )
-    )
+    return _claude(prompt) if os.getenv("ANTHROPIC_API_KEY") else _ollama(prompt)
 
 
 def explain(question, runs, analyst=None):
