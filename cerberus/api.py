@@ -75,4 +75,13 @@ def incidents(service: str = DEFAULT_SERVICE, minutes: int = 15):
 @app.post("/ask")
 def ask(a: Ask):
     runs = _runs(a.service, a.minutes)
-    return {"answer": explain(a.question, runs), "runs": runs[:5]}
+    try:
+        answer = explain(a.question, runs)
+    except Exception as e:
+        # The incident facts are still useful without prose, so return them with a
+        # readable note instead of a 500 that loses the analysis entirely.
+        answer = (
+            f"Copilot unavailable ({type(e).__name__}). The ranked runs below are still "
+            "accurate. Set ANTHROPIC_API_KEY for Claude, or check that Ollama is reachable."
+        )
+    return {"answer": answer, "runs": runs[:5]}

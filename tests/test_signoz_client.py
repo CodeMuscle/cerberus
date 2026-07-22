@@ -34,13 +34,42 @@ def test_fetch_spans_empty_transport():
     assert fetch_spans("svc", transport=lambda: []) == []
 
 
-def test_rows_finds_span_list_whatever_the_wrapper_key():
-    assert _rows(json.dumps({"data": {"spans": RAW_ROWS}})) == RAW_ROWS
-    assert _rows(json.dumps({"result": RAW_ROWS})) == RAW_ROWS
-    assert _rows(json.dumps(RAW_ROWS)) == RAW_ROWS
+def _payload(rows, note=""):
+    """The envelope signoz_execute_builder_query actually returns."""
+    body = json.dumps({"status": "success", "data": {"data": {"results": [{"rows": rows}]}}})
+    return body + note
+
+
+def test_rows_unwraps_builder_query_envelope():
+    rows = [{"data": {"trace_id": "t1", "name": "judge"}, "timestamp": "2026-07-22T06:54:09Z"}]
+    assert _rows(_payload(rows)) == [{"trace_id": "t1", "name": "judge"}]
+
+
+def test_rows_ignores_trailing_note():
+    # The server appends a human-readable pagination note after the JSON object,
+    # which makes a plain json.loads() raise and silently yield zero spans.
+    rows = [{"data": {"trace_id": "t1"}}]
+    note = "\nnote: returned 1 rows (limit 1) — more results likely exist (hasMore=true)."
+    assert _rows(_payload(rows, note)) == [{"trace_id": "t1"}]
+
+
+def test_rows_concatenates_multiple_results():
+    payload = json.dumps(
+        {
+            "data": {
+                "data": {
+                    "results": [
+                        {"rows": [{"data": {"span_id": "a"}}]},
+                        {"rows": [{"data": {"span_id": "b"}}]},
+                    ]
+                }
+            }
+        }
+    )
+    assert _rows(payload) == [{"span_id": "a"}, {"span_id": "b"}]
 
 
 def test_rows_survives_non_json_and_empty_payloads():
     assert _rows("No traces found in the last 15m.") == []
     assert _rows("") == []
-    assert _rows(json.dumps({"data": {"spans": []}})) == []
+    assert _rows(_payload([])) == []

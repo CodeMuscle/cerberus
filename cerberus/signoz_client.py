@@ -13,6 +13,7 @@ place that knows what the payload looks like.
 import asyncio
 import json
 import os
+import time
 
 from cerberus.model import Span, span_from_signoz
 
@@ -49,30 +50,88 @@ def call_tool(name: str, arguments: dict) -> str:
 def _rows(payload: str) -> list[dict]:
     """Dig the span rows out of an MCP text payload.
 
-    The server wraps results differently per tool/version, so rather than pin one
-    key we take the first list-of-dicts we find. Non-JSON payloads (an error
-    string, a rendered table) yield no rows instead of raising.
+    Two things the payload does that a plain json.loads() gets wrong:
+      * it can carry a trailing human-readable note after the JSON object
+        ("note: returned 3 rows (limit 3) ..."), so we decode a prefix, and
+      * each row wraps its fields in a "data" sub-object alongside "timestamp",
+        so the span fields are one level down.
+
+    Rows come back flat (trace_id, duration_nano, gen_ai.usage.*), which is what
+    span_from_signoz expects. A non-JSON payload (an error string) yields no rows
+    rather than raising.
     """
     try:
-        data = json.loads(payload)
-    except (json.JSONDecodeError, TypeError):
+        data, _ = json.JSONDecoder().raw_decode(payload.lstrip())
+    except (json.JSONDecodeError, AttributeError):
         return []
-    stack = [data]
-    while stack:
-        node = stack.pop(0)
-        if isinstance(node, list):
-            if node and all(isinstance(x, dict) for x in node):
-                return node
-        elif isinstance(node, dict):
-            stack.extend(node.values())
-    return []
+    results = data.get("data", {}).get("data", {}).get("results") or []
+    rows = [row for result in results for row in result.get("rows", [])]
+    # Unwrap {"data": {...}, "timestamp": ...}; tolerate already-flat rows.
+    return [row.get("data", row) if isinstance(row, dict) else row for row in rows]
+
+
+def _field(name: str, dtype: str, context: str) -> dict:
+    return {"name": name, "fieldDataType": dtype, "signal": "traces", "fieldContext": context}
+
+
+# The columns summarize() needs. signoz_search_traces returns a fixed projection
+# that omits span attributes entirely, so the gen_ai.* token and cost fields have
+# to be selected explicitly through the Query Builder.
+_SELECT = [
+    _field("trace_id", "string", "span"),
+    _field("span_id", "string", "span"),
+    _field("name", "string", "span"),
+    _field("has_error", "bool", "span"),
+    _field("duration_nano", "number", "span"),
+    _field("service.name", "string", "resource"),
+    _field("gen_ai.usage.input_tokens", "number", "tag"),
+    _field("gen_ai.usage.output_tokens", "number", "tag"),
+    _field("gen_ai.usage.cost_usd", "number", "tag"),
+]
+
+
+def build_query(service: str, minutes: int, now_ms: int, limit: int = 200) -> dict:
+    """A SigNoz Query Builder v5 raw-trace request for one service's spans."""
+    return {
+        "schemaVersion": "v1",
+        "start": now_ms - minutes * 60_000,
+        "end": now_ms,
+        "requestType": "raw",
+        "compositeQuery": {
+            "queries": [
+                {
+                    "type": "builder_query",
+                    "spec": {
+                        "name": "A",
+                        "signal": "traces",
+                        "disabled": False,
+                        "limit": limit,
+                        "offset": 0,
+                        "order": [{"key": {"name": "timestamp"}, "direction": "desc"}],
+                        "having": {"expression": ""},
+                        "filter": {"expression": f"service.name = '{service}'"},
+                        "selectFields": _SELECT,
+                    },
+                }
+            ]
+        },
+        "formatOptions": {"formatTableResultForUI": False, "fillGaps": False},
+        "variables": {},
+    }
 
 
 def _default_transport(service: str, minutes: int) -> list[dict]:
+    query = build_query(service, minutes, int(time.time() * 1000))
     return _rows(
         call_tool(
-            "signoz_search_traces",
-            {"service": service, "timeRange": f"{minutes}m", "limit": 200},
+            "signoz_execute_builder_query",
+            {
+                "query": query,
+                "searchContext": (
+                    f"List spans for service {service} over the last {minutes} minutes with "
+                    "gen_ai token and cost attributes, to rank agent runs by failure and spend."
+                ),
+            },
         )
     )
 

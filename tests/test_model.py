@@ -52,3 +52,31 @@ def test_span_from_mcp_row_no_error_is_ok():
 def test_span_from_unknown_row_degrades_to_unset():
     s = span_from_signoz({})
     assert s.trace_id == "" and s.status == "unset" and s.duration_ms == 0.0
+
+
+# A real row from signoz_execute_builder_query: flat, dotted resource/tag names,
+# and the gen_ai attributes sit alongside the span columns rather than in a
+# nested bag. Captured from a live SigNoz v0.133 instance.
+BUILDER_ROW = {
+    "trace_id": "e810dd9331230d212cd9b219963af606",
+    "span_id": "cff4a3ad708ec77b",
+    "name": "judge",
+    "service.name": "cerberus-demo-agent",
+    "has_error": True,
+    "duration_nano": 54_082_000,
+    "gen_ai.usage.input_tokens": 4000,
+    "gen_ai.usage.output_tokens": 80,
+    "gen_ai.usage.cost_usd": 0.122,
+}
+
+
+def test_span_from_builder_query_row_keeps_gen_ai_attrs():
+    s = span_from_signoz(BUILDER_ROW)
+    assert s.trace_id == "e810dd9331230d212cd9b219963af606"
+    assert s.name == "judge" and s.service == "cerberus-demo-agent"
+    assert s.status == "error"
+    assert s.duration_ms == 54.082
+    # summarize() reads tokens/cost straight off attrs, so the flat row must
+    # itself serve as the attribute bag.
+    assert s.attrs["gen_ai.usage.input_tokens"] == 4000
+    assert s.attrs["gen_ai.usage.cost_usd"] == 0.122

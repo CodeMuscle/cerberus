@@ -36,7 +36,9 @@ def _ollama(prompt: str) -> str:
             "prompt": prompt,
             "stream": False,
         },
-        timeout=120,
+        # A local 8B model sharing a laptop with SigNoz can take minutes per answer,
+        # so this is generous by default and tunable for slower hardware.
+        timeout=float(os.getenv("OLLAMA_TIMEOUT", "600")),
     )
     r.raise_for_status()
     return r.json().get("response", "")

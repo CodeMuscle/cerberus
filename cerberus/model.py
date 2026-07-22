@@ -34,5 +34,7 @@ def span_from_signoz(d: dict) -> Span:
         service=d.get("serviceName") or d.get("service_name") or d.get("service.name", ""),
         duration_ms=(d.get("durationNano") or d.get("duration_nano") or 0) / 1_000_000,
         status=_status(d),
-        attrs=d.get("tagMap") or d.get("attributes") or d.get("attributes_string") or {},
+        # Query Builder rows are flat — the row itself carries gen_ai.usage.* —
+        # while trace-explorer rows nest attributes under tagMap/attributes.
+        attrs=d.get("tagMap") or d.get("attributes") or d.get("attributes_string") or d,
     )
