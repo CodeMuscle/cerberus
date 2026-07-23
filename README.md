@@ -6,7 +6,7 @@
 
 Emits *and* consumes [SigNoz](https://signoz.io/) — OpenTelemetry in, plain-English incident answers out, and the alert that would have caught it back.
 
-[**Live demo →**](https://cerberus-sre.vercel.app) &nbsp;·&nbsp; [Dashboard](https://cerberus-sre.vercel.app/dashboard)
+[**Live demo**](https://cerberus-sre.vercel.app) &nbsp;·&nbsp; [Dashboard](https://cerberus-sre.vercel.app/dashboard)
 
 [![CI](https://github.com/CodeMuscle/cerberus/actions/workflows/ci.yml/badge.svg)](https://github.com/CodeMuscle/cerberus/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.11+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
