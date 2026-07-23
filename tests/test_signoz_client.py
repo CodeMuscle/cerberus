@@ -73,3 +73,9 @@ def test_rows_survives_non_json_and_empty_payloads():
     assert _rows("No traces found in the last 15m.") == []
     assert _rows("") == []
     assert _rows(_payload([])) == []
+
+
+def test_rows_handles_null_rows_from_empty_window():
+    # An empty time window comes back as "rows": null, not [].
+    payload = json.dumps({"data": {"data": {"results": [{"rows": None}]}}})
+    assert _rows(payload) == []

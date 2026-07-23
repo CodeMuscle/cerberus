@@ -65,7 +65,9 @@ def _rows(payload: str) -> list[dict]:
     except (json.JSONDecodeError, AttributeError):
         return []
     results = data.get("data", {}).get("data", {}).get("results") or []
-    rows = [row for result in results for row in result.get("rows", [])]
+    # An empty window comes back as "rows": null, so `or []` — not a default — is
+    # what keeps the flat-map from iterating None.
+    rows = [row for result in results for row in (result.get("rows") or [])]
     # Unwrap {"data": {...}, "timestamp": ...}; tolerate already-flat rows.
     return [row.get("data", row) if isinstance(row, dict) else row for row in rows]
 
