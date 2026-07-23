@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from cerberus.alerts import arm
 from cerberus.analyze import summarize
 from cerberus.copilot import explain
 from cerberus.signoz_client import fetch_spans
@@ -28,6 +29,11 @@ class Ask(BaseModel):
     question: str
     service: str = DEFAULT_SERVICE
     minutes: int = 15
+
+
+class Guard(BaseModel):
+    service: str = DEFAULT_SERVICE
+    token_baseline: int = 1000
 
 
 def _causes(e: BaseException, depth: int = 0):
@@ -85,3 +91,16 @@ def ask(a: Ask):
             "accurate. Set ANTHROPIC_API_KEY for Claude, or check that Ollama is reachable."
         )
     return {"answer": answer, "runs": runs[:5]}
+
+
+@app.post("/guard")
+def guard(g: Guard):
+    """Close the loop: create the SigNoz alert rule that would have caught this
+    service's token-spike incidents. Idempotent."""
+    try:
+        return arm(g.service, g.token_baseline)
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Could not create the alert via the SigNoz MCP server: {str(e)[:300]}",
+        ) from e
