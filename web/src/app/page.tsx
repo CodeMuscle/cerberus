@@ -1,382 +1,233 @@
-"use client";
+import Link from "next/link";
 
-import { useCallback, useEffect, useState } from "react";
-import { Bar, BarChart, Cell, ResponsiveContainer, XAxis, YAxis } from "recharts";
+const REPO = "https://github.com/CodeMuscle/cerberus";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+function Mark({ size = 30 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden>
+      <rect width="32" height="32" rx="7" fill="#16171b" />
+      <rect x="6.5" y="15.5" width="4" height="9.5" rx="2" fill="#ff7a45" />
+      <rect x="14" y="8.5" width="4" height="16.5" rx="2" fill="#ff7a45" />
+      <rect x="21.5" y="12" width="4" height="13" rx="2" fill="#ff9d70" />
+    </svg>
+  );
+}
 
-const API = process.env.NEXT_PUBLIC_CERBERUS_API ?? "http://localhost:8030";
-
-type Run = {
-  trace_id: string;
-  ok: boolean;
-  failed_steps: string[];
-  total_tokens: number;
-  cost_usd: number;
-  max_latency_ms: number;
-  flags: string[];
-};
-
-const WINDOWS = [
-  { label: "15m", minutes: 15 },
-  { label: "1h", minutes: 60 },
-  { label: "6h", minutes: 360 },
-  { label: "24h", minutes: 1440 },
+const HEADS = [
+  {
+    n: "01",
+    k: "Observe",
+    body: "Every agent run lands in SigNoz as OpenTelemetry traces — token usage, cost, latency, and errors, per step. Cerberus emits the telemetry and reads it back.",
+  },
+  {
+    n: "02",
+    k: "Explain",
+    body: "The copilot reads the ranked incidents and answers in plain English, grounded only in the facts it was given, and cites the trace_id. No speculation.",
+  },
+  {
+    n: "03",
+    k: "Prevent",
+    body: "One click writes the SigNoz alert rule that would have caught the incident — created through the same MCP server Cerberus reads from.",
+  },
 ];
 
-const shortId = (id: string) => id.slice(0, 8);
+const PIPELINE = ["Agent", "OpenTelemetry", "SigNoz", "MCP server", "Cerberus", "Alert rule"];
 
-const usd = (n: number) =>
-  n >= 0.01 ? `$${n.toFixed(2)}` : `$${n.toFixed(4)}`;
+const STACK = [
+  "SigNoz",
+  "OpenTelemetry",
+  "SigNoz MCP server",
+  "Query Builder v5",
+  "Claude",
+  "FastAPI",
+  "Next.js",
+];
 
-// One vocabulary for the three flags, reused by badges and the chart.
-const FLAG = {
-  error: { label: "error", color: "var(--destructive)" },
-  token_spike: { label: "token spike", color: "var(--warn)" },
-  cost_spike: { label: "cost spike", color: "var(--warn)" },
-} as const;
-
-function Flag({ name }: { name: string }) {
-  const f = FLAG[name as keyof typeof FLAG] ?? { label: name, color: "var(--muted-foreground)" };
-  return (
-    <span
-      className="tnum inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium"
-      style={{ borderColor: f.color, color: f.color }}
-    >
-      <span className="size-1.5 rounded-full" style={{ background: f.color }} />
-      {f.label}
-    </span>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  sub,
-  tone,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  tone?: "ember" | "warn";
-}) {
-  const bar =
-    tone === "ember" ? "var(--primary)" : tone === "warn" ? "var(--warn)" : "var(--border)";
-  return (
-    <Card className="relative overflow-hidden rounded-xl border-border/70 bg-card/60 py-0 backdrop-blur-sm">
-      <span className="absolute inset-y-0 left-0 w-[3px]" style={{ background: bar }} />
-      <CardContent className="px-5 py-4">
-        <p className="text-[0.68rem] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-          {label}
-        </p>
-        <p className="tnum mt-2 text-3xl font-semibold leading-none tracking-tight">{value}</p>
-        {sub && <p className="tnum mt-2 text-xs text-muted-foreground">{sub}</p>}
-      </CardContent>
-    </Card>
-  );
-}
-
-export default function Home() {
-  const [minutes, setMinutes] = useState(1440);
-  const [runs, setRuns] = useState<Run[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [question, setQuestion] = useState("What went wrong in the last few runs and what did it cost?");
-  const [answer, setAnswer] = useState<string | null>(null);
-  const [asking, setAsking] = useState(false);
-  const [guard, setGuard] = useState<string | null>(null);
-  const [arming, setArming] = useState(false);
-
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch(`${API}/incidents?minutes=${minutes}`, { cache: "no-store" });
-      if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        throw new Error(body?.detail ?? `incidents returned ${res.status}`);
-      }
-      setRuns(await res.json());
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  }, [minutes]);
-
-  useEffect(() => {
-    const first = setTimeout(load, 0);
-    const poll = setInterval(load, 10_000);
-    return () => {
-      clearTimeout(first);
-      clearInterval(poll);
-    };
-  }, [load]);
-
-  async function ask() {
-    setAsking(true);
-    setAnswer(null);
-    try {
-      const res = await fetch(`${API}/ask`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, minutes }),
-      });
-      if (!res.ok) throw new Error(`ask returned ${res.status}`);
-      setAnswer((await res.json()).answer);
-    } catch (e) {
-      setAnswer(`Copilot unavailable: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setAsking(false);
-    }
-  }
-
-  async function arm() {
-    setArming(true);
-    setGuard(null);
-    try {
-      const res = await fetch(`${API}/guard`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body?.detail ?? `guard returned ${res.status}`);
-      setGuard(
-        body.created
-          ? `Armed “${body.alert}” → ${body.channel}.`
-          : `Already armed: “${body.alert}”.`,
-      );
-    } catch (e) {
-      setGuard(`Couldn't arm: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setArming(false);
-    }
-  }
-
-  const failed = runs.filter((r) => !r.ok).length;
-  const tokens = runs.reduce((n, r) => n + r.total_tokens, 0);
-  const cost = runs.reduce((n, r) => n + r.cost_usd, 0);
-  const chart = runs.map((r) => ({ run: shortId(r.trace_id), tokens: r.total_tokens, ok: r.ok }));
-
+export default function Landing() {
   return (
     <div className="min-h-screen">
-      {/* Top bar — full-bleed, sticky, hairline base */}
-      <header className="sticky top-0 z-20 border-b border-border/70 bg-background/80 backdrop-blur-md">
-        <div className="flex items-center gap-4 px-6 py-3.5 md:px-10">
-          <div className="flex items-center gap-2.5">
-            <svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden>
-              <rect width="32" height="32" rx="7" fill="#16171b" />
-              <rect x="6.5" y="15.5" width="4" height="9.5" rx="2" fill="#ff7a45" />
-              <rect x="14" y="8.5" width="4" height="16.5" rx="2" fill="#ff7a45" />
-              <rect x="21.5" y="12" width="4" height="13" rx="2" fill="#ff9d70" />
-            </svg>
-            <div className="leading-tight">
-              <p className="text-sm font-semibold tracking-tight">Cerberus</p>
-              <p className="text-[0.66rem] uppercase tracking-[0.16em] text-muted-foreground">
-                SRE Copilot
-              </p>
-            </div>
-          </div>
+      {/* Nav — edge-aligned, minimal */}
+      <nav className="mx-auto flex max-w-6xl items-center gap-4 px-6 py-5">
+        <Link
+          href="/"
+          className="flex items-center gap-2.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <Mark size={26} />
+          <span className="text-sm font-semibold tracking-tight">Cerberus</span>
+        </Link>
+        <div className="ml-auto flex items-center gap-1 text-sm">
+          <a
+            href={REPO}
+            className="rounded-lg px-3 py-1.5 text-muted-foreground transition-colors hover:text-foreground"
+          >
+            GitHub
+          </a>
+          <Link
+            href="/dashboard"
+            className="rounded-lg bg-primary px-3.5 py-1.5 font-medium text-primary-foreground transition-transform hover:-translate-y-px"
+          >
+            Open dashboard
+          </Link>
+        </div>
+      </nav>
 
-          <div className="ml-auto flex items-center gap-4">
-            <span className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex">
-              <span className="live-dot size-2 rounded-full bg-primary" />
-              live · SigNoz
-            </span>
-            <div className="flex items-center rounded-lg border border-border/70 bg-card/50 p-0.5">
-              {WINDOWS.map((w) => (
-                <button
-                  key={w.minutes}
-                  onClick={() => setMinutes(w.minutes)}
-                  className={`tnum rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                    minutes === w.minutes
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {w.label}
-                </button>
-              ))}
-            </div>
-          </div>
+      {/* Hero */}
+      <header className="mx-auto max-w-6xl px-6 pb-20 pt-16 md:pt-24">
+        <p className="rise inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/50 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+          <span className="live-dot size-1.5 rounded-full bg-primary" />
+          AI SRE Copilot · Agents of SigNoz
+        </p>
+        <h1 className="rise mt-7 max-w-3xl text-5xl font-semibold leading-[1.02] tracking-tight md:text-7xl">
+          Your AI agent&apos;s failures,{" "}
+          <span className="text-primary">explained.</span>
+        </h1>
+        <p className="rise mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground">
+          Cerberus reads your agent&apos;s SigNoz traces, ranks every run by failure and spend,
+          explains the worst ones with trace citations, and writes the alert that would have caught
+          them.
+        </p>
+        <div className="rise mt-9 flex flex-wrap items-center gap-3">
+          <Link
+            href="/dashboard"
+            className="rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition-transform hover:-translate-y-px"
+          >
+            Open the dashboard →
+          </Link>
+          <a
+            href={REPO}
+            className="rounded-xl border border-border/70 bg-card/40 px-5 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-card"
+          >
+            View source
+          </a>
         </div>
       </header>
 
-      <main className="px-6 py-8 md:px-10 md:py-10">
-        <div className="mb-2">
-          <h1 className="text-lg font-semibold tracking-tight">Agent telemetry</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Ranked incidents from your agent&apos;s SigNoz traces — what failed, what it cost, and the
-            alert that would have caught it.
-          </p>
-        </div>
-
-        {error && (
-          <div className="mt-5 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {error}
+      {/* The three heads */}
+      <section className="border-t border-border/60">
+        <div className="mx-auto max-w-6xl px-6 py-16 md:py-20">
+          <div className="mb-10 flex items-end justify-between gap-4">
+            <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">
+              Three heads, one watchdog
+            </h2>
+            <p className="hidden max-w-xs text-sm text-muted-foreground sm:block">
+              Traces, metrics, and logs — observe, explain, and prevent.
+            </p>
           </div>
-        )}
-
-        {/* KPI strip */}
-        <section className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <Stat label="Runs" value={String(runs.length)} sub="in window" />
-          <Stat
-            label="Failed"
-            value={String(failed)}
-            sub={runs.length ? `${Math.round((failed / runs.length) * 100)}% of runs` : "—"}
-            tone={failed ? "ember" : undefined}
-          />
-          <Stat label="Tokens" value={tokens.toLocaleString()} sub="input + output" />
-          <Stat
-            label="Est. cost"
-            value={usd(cost)}
-            sub="gen_ai.usage.cost_usd"
-            tone={cost > 0.05 ? "warn" : undefined}
-          />
-        </section>
-
-        {/* Main band — full-bleed two column */}
-        <div className="mt-6 grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-          {/* Left: chart + incidents */}
-          <div className="space-y-6">
-            <Card className="rise rounded-xl border-border/70 bg-card/60 backdrop-blur-sm">
-              <CardContent className="px-5 py-5">
-                <div className="mb-4 flex items-baseline justify-between">
-                  <h2 className="text-sm font-semibold">Token usage by run</h2>
-                  <span className="text-xs text-muted-foreground">ember = failed</span>
+          <div className="grid gap-4 md:grid-cols-3">
+            {HEADS.map((h) => (
+              <div
+                key={h.n}
+                className="group rounded-2xl border border-border/70 bg-card/50 p-6 backdrop-blur-sm transition-colors hover:bg-card"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="tnum text-sm font-semibold text-primary">{h.n}</span>
+                  <span className="h-px flex-1 bg-border" />
                 </div>
-                <div className="h-52">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chart} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
-                      <XAxis
-                        dataKey="run"
-                        fontSize={11}
-                        tickLine={false}
-                        axisLine={false}
-                        stroke="var(--muted-foreground)"
-                      />
-                      <YAxis
-                        fontSize={11}
-                        tickLine={false}
-                        axisLine={false}
-                        width={44}
-                        stroke="var(--muted-foreground)"
-                      />
-                      <Bar dataKey="tokens" radius={[4, 4, 0, 0]}>
-                        {chart.map((c, i) => (
-                          <Cell
-                            key={i}
-                            fill={c.ok ? "var(--muted-foreground)" : "var(--primary)"}
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-
-            <div>
-              <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
-                Incidents
-                <span className="text-xs font-normal text-muted-foreground">worst first</span>
-              </h2>
-              <div className="space-y-2.5">
-                {runs.length === 0 && !error && (
-                  <p className="rounded-lg border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">
-                    No runs in this window. Generate some with{" "}
-                    <code className="text-foreground">curl &quot;localhost:8090/run?fail=1&quot;</code>.
-                  </p>
-                )}
-                {runs.map((r) => (
-                  <Card
-                    key={r.trace_id}
-                    className="rise rounded-xl border-border/70 bg-card/50 py-0 backdrop-blur-sm transition-colors hover:bg-card"
-                  >
-                    <CardContent className="flex flex-wrap items-center gap-x-5 gap-y-2.5 px-5 py-3.5">
-                      <span
-                        className="size-2 shrink-0 rounded-full"
-                        style={{ background: r.ok ? "var(--ok)" : "var(--destructive)" }}
-                      />
-                      <code className="tnum text-sm text-foreground">{shortId(r.trace_id)}</code>
-                      <span className="text-sm text-muted-foreground">
-                        {r.ok ? "healthy" : `failed at ${r.failed_steps.join(" · ")}`}
-                      </span>
-                      <span className="tnum ml-auto flex items-center gap-4 text-xs text-muted-foreground">
-                        <span>{r.total_tokens.toLocaleString()} tok</span>
-                        <span>{usd(r.cost_usd)}</span>
-                        <span>{r.max_latency_ms} ms</span>
-                      </span>
-                      {r.flags.length > 0 && (
-                        <div className="flex w-full flex-wrap gap-1.5 sm:w-auto">
-                          {r.flags.map((f) => (
-                            <Flag key={f} name={f} />
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
+                <h3 className="mt-5 text-lg font-semibold tracking-tight">{h.k}</h3>
+                <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">{h.body}</p>
               </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* How it works — real pipeline */}
+      <section className="border-t border-border/60">
+        <div className="mx-auto max-w-6xl px-6 py-16 md:py-20">
+          <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">How it works</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            Cerberus both emits telemetry to SigNoz and consumes it back — the read path speaks MCP,
+            so the same tool surface an AI client gets is the surface Cerberus is built on.
+          </p>
+          <div className="mt-9 flex flex-wrap items-center gap-2">
+            {PIPELINE.map((step, i) => (
+              <div key={step} className="flex items-center gap-2">
+                <span
+                  className={`tnum rounded-lg border px-3.5 py-2 text-sm ${
+                    step === "Cerberus"
+                      ? "border-primary/50 bg-primary/10 font-semibold text-primary"
+                      : "border-border/70 bg-card/50 text-foreground"
+                  }`}
+                >
+                  {step}
+                </span>
+                {i < PIPELINE.length - 1 && (
+                  <span className="text-muted-foreground" aria-hidden>
+                    →
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Reproducible */}
+      <section className="border-t border-border/60">
+        <div className="mx-auto grid max-w-6xl gap-8 px-6 py-16 md:grid-cols-2 md:py-20">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">
+              Reproducible in one command
+            </h2>
+            <p className="mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
+              The repo ships <code className="text-foreground">casting.yaml</code> and its lock. One
+              Foundry command brings up SigNoz and the MCP server — no click-built setup to
+              reproduce.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              {STACK.map((s) => (
+                <span
+                  key={s}
+                  className="rounded-full border border-border/70 bg-card/40 px-3 py-1 text-xs text-muted-foreground"
+                >
+                  {s}
+                </span>
+              ))}
             </div>
           </div>
-
-          {/* Right: copilot + guard, sticky */}
-          <div className="space-y-6 lg:sticky lg:top-24 lg:self-start">
-            <Card className="rise rounded-xl border-border/70 bg-card/60 backdrop-blur-sm">
-              <CardContent className="space-y-4 px-5 py-5">
-                <div className="flex items-center gap-2">
-                  <span className="size-2 rounded-full bg-primary" />
-                  <h2 className="text-sm font-semibold">Ask the copilot</h2>
-                </div>
-                <div className="flex gap-2">
-                  <Input
-                    value={question}
-                    onChange={(e) => setQuestion(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && !asking && ask()}
-                    placeholder="Ask about failures or cost…"
-                    className="bg-background/60"
-                  />
-                  <Button onClick={ask} disabled={asking || question.trim() === ""}>
-                    {asking ? "Thinking…" : "Ask"}
-                  </Button>
-                </div>
-                {answer && (
-                  <p className="rounded-lg border border-border/70 bg-background/50 p-3.5 text-sm leading-relaxed text-foreground">
-                    {answer}
-                  </p>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  Grounded only in the ranked runs above — every answer cites a trace_id.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="rise rounded-xl border-border/70 bg-card/60 backdrop-blur-sm">
-              <CardContent className="space-y-3 px-5 py-5">
-                <h2 className="text-sm font-semibold">Close the loop</h2>
-                <p className="text-sm text-muted-foreground">
-                  Create the SigNoz alert rule that would have caught these token spikes — written back
-                  through the same MCP server Cerberus reads from.
-                </p>
-                <Button
-                  onClick={arm}
-                  disabled={arming}
-                  variant="outline"
-                  className="w-full border-primary/40 text-primary hover:bg-primary/10 hover:text-primary"
-                >
-                  {arming ? "Arming…" : "Arm token-spike alert"}
-                </Button>
-                {guard && <p className="text-xs text-muted-foreground">{guard}</p>}
-              </CardContent>
-            </Card>
+          <div className="rounded-2xl border border-border/70 bg-[oklch(0.14_0.006_264)] p-5 font-mono text-sm leading-relaxed">
+            <p className="text-muted-foreground"># bring up SigNoz + the MCP server</p>
+            <p className="mt-1">
+              <span className="text-primary">$</span> foundryctl cast -f casting.yaml
+            </p>
+            <p className="mt-4 text-muted-foreground"># read incidents, explain, arm the alert</p>
+            <p className="mt-1">
+              <span className="text-primary">$</span> uvicorn cerberus.api:app
+            </p>
           </div>
         </div>
-      </main>
+      </section>
 
-      <footer className="border-t border-border/70 px-6 py-6 md:px-10">
-        <p className="text-xs text-muted-foreground">
-          Cerberus · observes and consumes SigNoz over OpenTelemetry + the SigNoz MCP server.
-        </p>
+      {/* CTA */}
+      <section className="border-t border-border/60">
+        <div className="mx-auto max-w-6xl px-6 py-20 text-center md:py-28">
+          <div className="mx-auto mb-6 w-fit">
+            <Mark size={40} />
+          </div>
+          <h2 className="mx-auto max-w-2xl text-3xl font-semibold tracking-tight md:text-4xl">
+            See what your agent broke, and what it cost.
+          </h2>
+          <div className="mt-8">
+            <Link
+              href="/dashboard"
+              className="inline-block rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-transform hover:-translate-y-px"
+            >
+              Open the dashboard →
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <footer className="border-t border-border/60">
+        <div className="mx-auto flex max-w-6xl flex-col gap-2 px-6 py-8 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          <p>Cerberus · observes and consumes SigNoz over OpenTelemetry + the MCP server.</p>
+          <p>
+            Built with AI assistance for the Agents of SigNoz hackathon ·{" "}
+            <a href={REPO} className="text-foreground hover:text-primary">
+              source
+            </a>
+          </p>
+        </div>
       </footer>
     </div>
   );

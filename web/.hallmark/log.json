@@ -1,3 +1,4 @@
 [
+  { "date": "2026-07-23", "macrostructure": "Hero + Tri-pillar + Pipeline", "theme": "custom (graphite + ember, shared system)", "theme_axes": "dark / grotesk-sans / warm", "enrichment": "none (CSS motif + pipeline)", "brief": "Cerberus · landing page" },
   { "date": "2026-07-23", "macrostructure": "app-shell (dashboard)", "theme": "custom (graphite + ember)", "theme_axes": "dark / grotesk-sans / warm", "enrichment": "none", "brief": "Cerberus · AI SRE copilot dashboard" }
 ]
