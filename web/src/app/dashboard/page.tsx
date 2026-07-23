@@ -32,7 +32,6 @@ const shortId = (id: string) => id.slice(0, 8);
 const usd = (n: number) =>
   n >= 0.01 ? `$${n.toFixed(2)}` : `$${n.toFixed(4)}`;
 
-// One vocabulary for the three flags, reused by badges and the chart.
 const FLAG = {
   error: { label: "error", color: "var(--destructive)" },
   token_spike: { label: "token spike", color: "var(--warn)" },
@@ -159,8 +158,7 @@ export default function Home() {
   const chart = runs.map((r) => ({ run: shortId(r.trace_id), tokens: r.total_tokens, ok: r.ok }));
 
   return (
-    <div className="min-h-screen">
-      {/* Top bar — full-bleed, sticky, hairline base */}
+    <div className="min-h-dvh">
       <header className="sticky top-0 z-20 border-b border-border/70 bg-background/80 backdrop-blur-md">
         <div className="flex items-center gap-4 px-6 py-3.5 md:px-10">
           <Link href="/" className="flex items-center gap-2.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
@@ -217,7 +215,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* KPI strip */}
         <section className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
           <Stat label="Runs" value={String(runs.length)} sub="in window" />
           <Stat
@@ -235,9 +232,7 @@ export default function Home() {
           />
         </section>
 
-        {/* Main band — full-bleed two column */}
         <div className="mt-6 grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-          {/* Left: chart + incidents */}
           <div className="space-y-6">
             <Card className="rise rounded-xl border-border/70 bg-card/60 backdrop-blur-sm">
               <CardContent className="px-5 py-5">
@@ -321,7 +316,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Right: copilot + guard, sticky */}
           <div className="space-y-6 lg:sticky lg:top-24 lg:self-start">
             <Card className="rise rounded-xl border-border/70 bg-card/60 backdrop-blur-sm">
               <CardContent className="space-y-4 px-5 py-5">

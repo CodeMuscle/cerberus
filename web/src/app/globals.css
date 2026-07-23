@@ -2,10 +2,6 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-/* Hallmark · macrostructure: app-shell (dashboard) · tone: technical/precise · anchor hue: ember 45
- * Genre: modern-minimal (dark). Signature: molten-ember accent on graphite — the
- * three-headed watchdog, deliberately not observability-blue. Every figure is live data. */
-
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -54,7 +50,6 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Cerberus is a dark-only tool — the graphite/ember system lives on :root directly. */
 :root {
   --background: oklch(0.17 0.006 264);
   --foreground: oklch(0.97 0.003 264);
@@ -62,7 +57,7 @@
   --card-foreground: oklch(0.97 0.003 264);
   --popover: oklch(0.208 0.007 264);
   --popover-foreground: oklch(0.97 0.003 264);
-  /* primary = the ember accent, so shadcn Buttons inherit the brand */
+
   --primary: oklch(0.72 0.17 45);
   --primary-foreground: oklch(0.2 0.03 45);
   --secondary: oklch(0.255 0.007 264);
@@ -75,10 +70,10 @@
   --border: oklch(1 0 0 / 9%);
   --input: oklch(1 0 0 / 14%);
   --ring: oklch(0.72 0.17 45);
-  /* status semantics, shared with the token map above */
+
   --ok: oklch(0.72 0.13 158);
   --warn: oklch(0.79 0.15 74);
-  /* chart ramp anchored on ember → amber */
+
   --chart-1: oklch(0.72 0.17 45);
   --chart-2: oklch(0.79 0.15 74);
   --chart-3: oklch(0.64 0.2 25);
@@ -106,7 +101,7 @@
   body {
     @apply bg-background text-foreground;
     overflow-x: clip;
-    /* Faint ember bloom top-left + a hairline dot grid — atmosphere without noise. */
+
     background-image:
       radial-gradient(
         60rem 40rem at 12% -8%,
@@ -125,14 +120,13 @@
     background-size: 100% 100%, 100% 100%, 22px 22px;
     background-attachment: fixed, fixed, fixed;
   }
-  /* Tabular figures everywhere numbers matter in a dashboard. */
+
   .tnum {
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
   }
 }
 
-/* --- Motion: three primitives, all transform/opacity, reduced-motion collapses --- */
 @keyframes cerberus-rise {
   from {
     opacity: 0;
