@@ -14,6 +14,10 @@ Emits *and* consumes [SigNoz](https://signoz.io/) — OpenTelemetry in, plain-En
 [![Built on SigNoz](https://img.shields.io/badge/built%20on-SigNoz-E75A3B)](https://signoz.io/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](#license)
 
+<br/>
+
+<img src="web/public/dashboard.png" alt="Cerberus dashboard — ranked agent incidents from live SigNoz traces, with the copilot and one-click alert arming" width="900" />
+
 </div>
 
 ---
