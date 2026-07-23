@@ -16,7 +16,7 @@ def _claude(prompt: str) -> str:
 
     message = anthropic.Anthropic().messages.create(
         model=os.getenv("CERBERUS_MODEL", "claude-opus-4-8"),
-        max_tokens=1024,  # answers are 2-3 sentences; a bigger cap only adds latency
+        max_tokens=1024,
         system=SYSTEM,
         messages=[{"role": "user", "content": prompt}],
     )
@@ -36,8 +36,6 @@ def _ollama(prompt: str) -> str:
             "prompt": prompt,
             "stream": False,
         },
-        # A local 8B model sharing a laptop with SigNoz can take minutes per answer,
-        # so this is generous by default and tunable for slower hardware.
         timeout=float(os.getenv("OLLAMA_TIMEOUT", "600")),
     )
     r.raise_for_status()

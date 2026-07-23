@@ -23,8 +23,8 @@ app = FastAPI(title="cerberus-demo-agent")
 FastAPIInstrumentor.instrument_app(app)
 
 MODEL = os.getenv("DEMO_MODEL", "claude-opus-4-8")
-# Blended $/1K tokens for the demo workload. Non-zero so a runaway prompt shows up
-# as a cost spike in SigNoz, not just a token spike.
+
+
 COST_PER_1K = float(os.getenv("COST_PER_1K", "0.03"))
 
 
@@ -50,7 +50,7 @@ def run(fail: bool = False):
     with tracer.start_as_current_span("agent.run") as run_span:
         with tracer.start_as_current_span("extract_claims"):
             time.sleep(0.03)
-        # A failing run also blows up token usage (oversized prompt) -> cost spike.
+
         p_tok = 4000 if fail else 300
         try:
             _llm_span("judge", prompt_tokens=p_tok, completion_tokens=80, fail=fail)

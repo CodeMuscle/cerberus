@@ -65,10 +65,9 @@ def _rows(payload: str) -> list[dict]:
     except (json.JSONDecodeError, AttributeError):
         return []
     results = data.get("data", {}).get("data", {}).get("results") or []
-    # An empty window comes back as "rows": null, so `or []` — not a default — is
-    # what keeps the flat-map from iterating None.
+
     rows = [row for result in results for row in (result.get("rows") or [])]
-    # Unwrap {"data": {...}, "timestamp": ...}; tolerate already-flat rows.
+
     return [row.get("data", row) if isinstance(row, dict) else row for row in rows]
 
 
@@ -76,9 +75,6 @@ def _field(name: str, dtype: str, context: str) -> dict:
     return {"name": name, "fieldDataType": dtype, "signal": "traces", "fieldContext": context}
 
 
-# The columns summarize() needs. signoz_search_traces returns a fixed projection
-# that omits span attributes entirely, so the gen_ai.* token and cost fields have
-# to be selected explicitly through the Query Builder.
 _SELECT = [
     _field("trace_id", "string", "span"),
     _field("span_id", "string", "span"),

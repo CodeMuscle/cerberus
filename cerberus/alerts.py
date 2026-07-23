@@ -11,8 +11,8 @@ import json
 from cerberus.signoz_client import call_tool
 
 CHANNEL = "cerberus-webhook"
-# Placeholder sink — the channel only has to exist for the rule to be valid; the
-# demo shows the rule, not a delivered page. Override for a real endpoint.
+
+
 CHANNEL_URL = "http://localhost:9999/cerberus-alerts"
 
 

@@ -15,8 +15,7 @@ DEFAULT_SERVICE = os.getenv("CERBERUS_SERVICE", "cerberus-demo-agent")
 
 app = FastAPI(title="Cerberus")
 
-# The Next.js panel in web/ is served separately (dev :3000, prod :3000), so it is
-# cross-origin to this API.
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.getenv("CERBERUS_ORIGINS", "http://localhost:3000").split(","),
@@ -40,7 +39,7 @@ def _causes(e: BaseException, depth: int = 0):
     """Flatten an exception tree. The MCP client runs in a task group, so the real
     HTTP error is nested inside an ExceptionGroup — str(e) alone just says
     "unhandled errors in a TaskGroup" and hides the status code."""
-    if depth > 10:  # cause chains can cycle
+    if depth > 10:
         return
     yield e
     if isinstance(e, BaseExceptionGroup):
@@ -84,8 +83,6 @@ def ask(a: Ask):
     try:
         answer = explain(a.question, runs)
     except Exception as e:
-        # The incident facts are still useful without prose, so return them with a
-        # readable note instead of a 500 that loses the analysis entirely.
         answer = (
             f"Copilot unavailable ({type(e).__name__}). The ranked runs below are still "
             "accurate. Set ANTHROPIC_API_KEY for Claude, or check that Ollama is reachable."

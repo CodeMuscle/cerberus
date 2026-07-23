@@ -16,7 +16,7 @@ def test_arm_creates_channel_and_alert_when_absent():
 
     def caller(name, args):
         calls.append(name)
-        return '{"data": []}'  # nothing exists yet
+        return '{"data": []}'
 
     out = arm("svc", caller=caller)
     assert out["created"] is True

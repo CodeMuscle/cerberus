@@ -46,8 +46,7 @@ def test_rows_unwraps_builder_query_envelope():
 
 
 def test_rows_ignores_trailing_note():
-    # The server appends a human-readable pagination note after the JSON object,
-    # which makes a plain json.loads() raise and silently yield zero spans.
+
     rows = [{"data": {"trace_id": "t1"}}]
     note = "\nnote: returned 1 rows (limit 1) — more results likely exist (hasMore=true)."
     assert _rows(_payload(rows, note)) == [{"trace_id": "t1"}]
@@ -76,6 +75,6 @@ def test_rows_survives_non_json_and_empty_payloads():
 
 
 def test_rows_handles_null_rows_from_empty_window():
-    # An empty time window comes back as "rows": null, not [].
+
     payload = json.dumps({"data": {"data": {"results": [{"rows": None}]}}})
     assert _rows(payload) == []
