@@ -1,6 +1,8 @@
 <div align="center">
 
-# 🐺 Cerberus
+<img src="web/public/mark.svg" alt="Cerberus" width="60" height="60" />
+
+# Cerberus
 
 **An AI SRE copilot that reads your agent's telemetry and tells you what broke, what it cost, and what to do.**
 
