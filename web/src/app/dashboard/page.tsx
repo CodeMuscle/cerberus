@@ -87,6 +87,7 @@ export default function Home() {
   const [asking, setAsking] = useState(false);
   const [guard, setGuard] = useState<string | null>(null);
   const [arming, setArming] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -99,6 +100,8 @@ export default function Home() {
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoaded(true);
     }
   }, [minutes]);
 
@@ -277,7 +280,15 @@ export default function Home() {
                 <span className="text-xs font-normal text-muted-foreground">worst first</span>
               </h2>
               <div className="space-y-2.5">
-                {runs.length === 0 && !error && (
+                {!loaded &&
+                  !error &&
+                  [0, 1, 2].map((i) => (
+                    <div
+                      key={i}
+                      className="h-[58px] animate-pulse rounded-xl border border-border/70 bg-card/40"
+                    />
+                  ))}
+                {loaded && runs.length === 0 && !error && (
                   <p className="rounded-lg border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">
                     No runs in this window. Generate some with{" "}
                     <code className="text-foreground">curl &quot;localhost:8090/run?fail=1&quot;</code>.

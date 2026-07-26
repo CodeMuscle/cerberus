@@ -66,6 +66,12 @@ Cerberus leans on SigNoz deeply, not just as a sink:
 - **Alerts** (`signoz_create_alert`) + **notification channels** — the closer creates a `TRACES_BASED` threshold rule over `max(gen_ai.usage.input_tokens)`.
 - **Foundry** — one-command, reproducible deployment; `casting.yaml` and `casting.yaml.lock` are committed so judges can re-run it.
 
+The alert Cerberus writes back, live in SigNoz's Alert Rules (`generated_by: cerberus`):
+
+<div align="center">
+<img src="web/public/signoz-alert.png" alt="The Cerberus-created token-spike alert rule live in SigNoz's Alert Rules page" width="820" />
+</div>
+
 ## Quickstart
 
 ### 1. Deploy SigNoz + the MCP server (one command)
