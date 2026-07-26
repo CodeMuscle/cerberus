@@ -6,7 +6,7 @@
 
 Emits *and* consumes [SigNoz](https://signoz.io/) — OpenTelemetry in, plain-English incident answers out, and the alert that would have caught it back.
 
-[**Live demo**](https://cerberus-sre.vercel.app) · [Dashboard](https://cerberus-sre.vercel.app/dashboard) · [Blog](https://dev.to/codemuscle00/i-gave-an-ai-sre-copilot-write-access-to-signoz-heres-what-the-mcp-server-actually-returns-1m6f)
+[**Live demo**](https://cerberus-sre.vercel.app) · [Dashboard](https://cerberus-sre.vercel.app/dashboard) · [Blog](https://dev.to/codemuscle00/i-gave-an-ai-sre-copilot-write-access-to-signoz-heres-what-the-mcp-server-actually-returns-1m6f) · [Video](https://youtu.be/h8wS1KKsH7c)
 
 [![CI](https://github.com/CodeMuscle/cerberus/actions/workflows/ci.yml/badge.svg)](https://github.com/CodeMuscle/cerberus/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.11+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
