@@ -16,9 +16,10 @@ import time
 from fastapi import FastAPI
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.trace import Status, StatusCode
-from otel import setup_tracing
+from otel import setup_logging, setup_tracing
 
 tracer = setup_tracing()
+log = setup_logging()
 app = FastAPI(title="cerberus-demo-agent")
 FastAPIInstrumentor.instrument_app(app)
 
@@ -48,6 +49,7 @@ def _llm_span(name, prompt_tokens, completion_tokens, fail=False):
 def run(fail: bool = False):
     """One agent run: extract claims -> judge -> result. ?fail=1 injects an incident."""
     with tracer.start_as_current_span("agent.run") as run_span:
+        log.info("agent.run started")
         with tracer.start_as_current_span("extract_claims"):
             time.sleep(0.03)
 
@@ -56,5 +58,7 @@ def run(fail: bool = False):
             _llm_span("judge", prompt_tokens=p_tok, completion_tokens=80, fail=fail)
         except RuntimeError as e:
             run_span.set_status(Status(StatusCode.ERROR, str(e)))
+            log.error("agent.run failed at judge: %s (input_tokens=%d)", e, p_tok)
             return {"ok": False, "error": str(e)}
+        log.info("agent.run ok (input_tokens=%d, model=%s)", p_tok, MODEL)
         return {"ok": True, "model": MODEL, "prompt_tokens": p_tok}
